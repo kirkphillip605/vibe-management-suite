@@ -1,0 +1,171 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:!Jameson5475!@137.220.61.175:5432/vibe"
+}
+
+enum UserRole {
+  admin
+  dj
+}
+
+enum VenueType {
+  bar
+  club
+  restaurant
+  private_event
+  wedding
+  corporate
+  festival
+  other
+}
+
+enum GigStatus {
+  scheduled
+  confirmed
+  completed
+  cancelled
+}
+
+model User {
+  id            Int         @id @default(autoincrement())
+  email         String      @unique
+  password      String
+  name          String
+  role          UserRole    @default(dj)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  djProfile     DjProfile?
+  createdGigs   Gig[]       @relation("CreatedByUser")
+  auditLogs     AuditLog[]
+  
+  @@map("users")
+}
+
+model Customer {
+  id            Int         @id @default(autoincrement())
+  name          String
+  email         String?
+  phone         String?
+  company       String?
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  gigs          Gig[]
+  
+  @@map("customers")
+}
+
+model Venue {
+  id            Int         @id @default(autoincrement())
+  name          String
+  venueType     VenueType   @default(other)
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  phone         String?
+  email         String?
+  capacity      Int?
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  gigs          Gig[]
+  
+  @@map("venues")
+}
+
+model Gig {
+  id              Int         @id @default(autoincrement())
+  customerId      Int
+  venueId         Int
+  djProfileId     Int?
+  createdById     Int
+  
+  eventDate       DateTime
+  startTime       String
+  endTime         String
+  status          GigStatus   @default(scheduled)
+  
+  eventType       String?
+  setupTime       DateTime?
+  soundCheck      DateTime?
+  
+  rate            Decimal?    @db.Decimal(10, 2)
+  deposit         Decimal?    @db.Decimal(10, 2)
+  balance         Decimal?    @db.Decimal(10, 2)
+  
+  isRecurring     Boolean     @default(false)
+  recurringPattern String?
+  parentGigId     Int?
+  
+  notes           String?     @db.Text
+  requirements    String?     @db.Text
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  customer        Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  venue           Venue       @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  djProfile       DjProfile?  @relation(fields: [djProfileId], references: [id], onDelete: SetNull)
+  createdBy       User        @relation("CreatedByUser", fields: [createdById], references: [id])
+  parentGig       Gig?        @relation("RecurringGigs", fields: [parentGigId], references: [id])
+  childGigs       Gig[]       @relation("RecurringGigs")
+  
+  @@map("gigs")
+}
+
+model DjProfile {
+  id              Int         @id @default(autoincrement())
+  userId          Int         @unique
+  
+  stageName       String?
+  bio             String?     @db.Text
+  phone           String?
+  emergencyContact String?
+  emergencyPhone  String?
+  
+  genres          String[]
+  equipment       String[]
+  
+  hourlyRate      Decimal?    @db.Decimal(10, 2)
+  
+  w9Uploaded      Boolean     @default(false)
+  w9FilePath      String?
+  contractSigned  Boolean     @default(false)
+  contractPath    String?
+  
+  isActive        Boolean     @default(true)
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gigs            Gig[]
+  
+  @@map("dj_profiles")
+}
+
+model AuditLog {
+  id            Int         @id @default(autoincrement())
+  userId        Int
+  entityType    String      // e.g., "Customer", "Venue", "Gig", "DjProfile"
+  entityId      Int
+  action        String      // e.g., "CREATE", "UPDATE", "DELETE"
+  changes       Json?       // Store old and new values
+  timestamp     DateTime    @default(now())
+  
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
